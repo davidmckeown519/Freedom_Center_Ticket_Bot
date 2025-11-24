@@ -17,6 +17,35 @@ def connect_to_browser():
 
 
 # -----------------------------------------
+# CLICK THE FIRST ENABLED "SELECT" BUTTON
+# -----------------------------------------
+def click_first_enabled_offering(driver):
+    try:
+        buttons = driver.find_elements(By.CSS_SELECTOR, "button.program-select-btn")
+
+        if not buttons:
+            print("No offering buttons found.")
+            return False
+
+        for btn in buttons:
+            disabled = btn.get_attribute("disabled")
+
+            if not disabled:   # This is the first AVAILABLE offering
+                driver.execute_script("arguments[0].scrollIntoView(true);", btn)
+                time.sleep(0.2)
+                driver.execute_script("arguments[0].click();", btn)
+                print("Clicked first ENABLED offering.")
+                return True
+
+        print("Only disabled offerings found — retrying…")
+        return False
+
+    except Exception as e:
+        print(f"Error clicking offering: {e}")
+        return False
+
+
+# -----------------------------------------
 # CLICK A BUTTON SAFELY BY ID
 # -----------------------------------------
 def safe_click_id(driver, element_id, timeout=6):
@@ -37,14 +66,11 @@ def safe_click_id(driver, element_id, timeout=6):
 # -----------------------------------------
 def click_dependent_checkbox(driver):
     try:
-        # Select the typo class 'depedent-selector'
         checkbox_input = WebDriverWait(driver, 8).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input.depedent-selector"))
         )
 
-        # The label is always the sibling label right after input
         label = checkbox_input.find_element(By.XPATH, "./following-sibling::label")
-
         driver.execute_script("arguments[0].scrollIntoView(true);", label)
         driver.execute_script("arguments[0].click();", label)
 
@@ -57,8 +83,7 @@ def click_dependent_checkbox(driver):
 
 
 # -----------------------------------------
-# CLICK THE CUSTOM-CONTROL-LABEL::before THING
-# (the waiver / confirmation checkbox)
+# CLICK CUSTOM CONTROL LABEL (waiver)
 # -----------------------------------------
 def click_custom_control_label(driver):
     try:
@@ -97,100 +122,77 @@ def click_proceed_checkout(driver):
 # MAIN LOOP
 # -----------------------------------------
 def main():
-    import time
     from datetime import datetime, timedelta
 
-    # Target time: today at 7:15:05 AM
-    target_time = datetime.now().replace(hour=7, minute=15, second=3, microsecond=0)
+    target_time = datetime.now().replace(hour=8, minute=22, second=3, microsecond=0)
+
     driver = connect_to_browser()
     print("Connected to existing Chrome session.")
-    # If the time has already passed today, schedule for tomorrow
+
     if datetime.now() > target_time:
         target_time += timedelta(days=1)
+
     print(f"Current Time: {datetime.now()}")
     print(f"Waiting until {target_time} to start...")
 
-    # Sleep until target time
+    # Wait until start time
     while datetime.now() < target_time:
-        time.sleep(0.5)  # check twice per second
+        time.sleep(0.5)
         print(datetime.now())
         driver.refresh()
 
     print("Time reached! Starting the bot...")
-
-    # === Start your Selenium bot here ===
-    # driver.refresh()
-    # ... rest of your script
-
 
     while True:
         print("\nRefreshing page...")
         driver.refresh()
         time.sleep(3)
 
-        # --- STEP 1: offering-select-1 ---
-        if not safe_click_id(driver, "offering-select-1"):
-            time.sleep(60)
+        # --- STEP 1: NEW METHOD — Click first enabled offering ---
+        if not click_first_enabled_offering(driver):
+            time.sleep(1)
             continue
 
         time.sleep(1)
 
         # --- STEP 2: registerBtn ---
         if not safe_click_id(driver, "registerBtn"):
-            time.sleep(60)
+            time.sleep(1)
             continue
 
         time.sleep(1)
-        # --- DEBUG: show all custom-control elements ---
-        print("\n--- DEBUG: Looking for the dependent checkbox ---")
-        elements = driver.find_elements(By.CSS_SELECTOR, "input.custom-control-input")
-        for e in elements:
-            print("ID:", e.get_attribute("id"),
-                "NAME:", e.get_attribute("name"),
-                "CLASS:", e.get_attribute("class"))
-        print("--- END DEBUG ---\n")
-
 
         # --- STEP 3: dependent checkbox ---
         if not click_dependent_checkbox(driver):
-            time.sleep(60)
+            time.sleep(1)
             continue
 
         time.sleep(1)
 
         # --- STEP 4: btnNext ---
         if not safe_click_id(driver, "btnNext"):
-            time.sleep(60)
+            time.sleep(1)
             continue
 
         time.sleep(2)
 
-        # --- STEP 5: Custom label for waiver ---
+        # --- STEP 5: waiver checkbox ---
         if not click_custom_control_label(driver):
-            time.sleep(60)
+            time.sleep(1)
             continue
 
         time.sleep(1)
 
-        # --- STEP 6: Proceed to Checkout Button ---
+        # --- STEP 6: proceed to checkout ---
         if not click_proceed_checkout(driver):
-            time.sleep(60)
+            time.sleep(1)
             continue
 
         time.sleep(2)
 
-        # --- STEP 7: STOP right before final checkout ---
-        try:
-            checkout_button = driver.find_element(By.XPATH, '//*[@id="checkoutButton"]')
-            print("\n🎉 SUCCESS! All steps completed up to checkoutButton.")
-            print("Stopped here so you can verify manually.")
-        except:
-            print("Checkout button not found — waiting and retrying.")
-            time.sleep(60)
-        # --- FINAL STEP: CLICK CHECKOUT BUTTON ---
-        print("\n--- DEBUG: Attempting checkout button ---")
-
+        # --- STEP 7: checkout button ---
         checkout_clicked = False
+
         while not checkout_clicked:
             try:
                 checkout_btn = WebDriverWait(driver, 10).until(
@@ -199,24 +201,25 @@ def main():
                 driver.execute_script("arguments[0].click();", checkout_btn)
                 print("Checkout button clicked.")
                 checkout_clicked = True
-            except Exception as e:
-                print(f"Checkout button not ready yet: {e}")
-                time.sleep(2)
+            except:
+                print("Checkout button not ready, refreshing...")
                 driver.refresh()
+                time.sleep(1)
 
-
-        # --- FINAL STEP 2: CLICK EXISTING CARD MODAL BUTTON (IF IT APPEARS) ---
-        print("\n--- DEBUG: Checking for existing card modal ---")
-        time.sleep(0.5)
+        # --- FINAL: Click existing card ---
         try:
-            card_link = driver.find_element(By.XPATH, "//a[contains(@id,'aChargeCardSM_') and contains(@class,'card-item-1-large')]")
+            card_link = driver.find_element(
+                By.XPATH,
+                "//a[contains(@id,'aChargeCardSM_') and contains(@class,'card-item-1-large')]"
+            )
             card_link.click()
             print("Existing card modal button clicked.")
-        except Exception as e:
-            print("error")
+        except:
+            print("Error clicking existing card modal.")
 
         print("Automation completed.")
 
 
 if __name__ == "__main__":
     main()
+
