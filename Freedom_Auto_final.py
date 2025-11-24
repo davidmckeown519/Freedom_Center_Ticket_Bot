@@ -31,7 +31,6 @@ def click_first_enabled_offering(driver):
             disabled = btn.get_attribute("disabled")
 
             if not disabled:   # This is the first AVAILABLE offering
-                driver.execute_script("arguments[0].scrollIntoView(true);", btn)
                 time.sleep(0.2)
                 driver.execute_script("arguments[0].click();", btn)
                 print("Clicked first ENABLED offering.")
@@ -124,22 +123,22 @@ def click_proceed_checkout(driver):
 def main():
     from datetime import datetime, timedelta
 
-    target_time = datetime.now().replace(hour=8, minute=22, second=3, microsecond=0)
+    target_time = datetime.now().replace(hour=8, minute=38, second=45, microsecond=0)
 
     driver = connect_to_browser()
     print("Connected to existing Chrome session.")
 
-    if datetime.now() > target_time:
-        target_time += timedelta(days=1)
+    # if datetime.now() > target_time:
+    #     target_time += timedelta(days=1)
 
-    print(f"Current Time: {datetime.now()}")
-    print(f"Waiting until {target_time} to start...")
+    # print(f"Current Time: {datetime.now()}")
+    # print(f"Waiting until {target_time} to start...")
 
-    # Wait until start time
-    while datetime.now() < target_time:
-        time.sleep(0.5)
-        print(datetime.now())
-        driver.refresh()
+    # # Wait until start time
+    # while datetime.now() < target_time:
+    #     time.sleep(0.5)
+    #     print(datetime.now())
+    #     driver.refresh()
 
     print("Time reached! Starting the bot...")
 
@@ -190,9 +189,12 @@ def main():
 
         time.sleep(2)
 
-        # --- STEP 7: checkout button ---
-        checkout_clicked = False
+        ### ----- STEP 7: CLICK EXISTING CARD (WITH CONTROLLED REFRESH) ----- ###
+        MAX_RETRIES = 25   # how many reloads allowed in Step 7 → Final
 
+        for attempt in range(MAX_RETRIES):
+
+            checkout_clicked = False
         while not checkout_clicked:
             try:
                 checkout_btn = WebDriverWait(driver, 10).until(
@@ -201,25 +203,32 @@ def main():
                 driver.execute_script("arguments[0].click();", checkout_btn)
                 print("Checkout button clicked.")
                 checkout_clicked = True
-            except:
-                print("Checkout button not ready, refreshing...")
+            except Exception as e:
+                print(f"Checkout button not ready yet: {e}")
+                time.sleep(2)
                 driver.refresh()
-                time.sleep(1)
+        ### ----- FINAL STEP: CLICK PAY BUTTON (WITH CONTROLLED REFRESH) ----- ###
+            try:
+                print(f"Attempt {attempt + 1}: Trying FINAL STEP…")
 
-        # --- FINAL: Click existing card ---
-        try:
-            card_link = driver.find_element(
-                By.XPATH,
-                "//a[contains(@id,'aChargeCardSM_') and contains(@class,'card-item-1-large')]"
-            )
-            card_link.click()
-            print("Existing card modal button clicked.")
-        except:
-            print("Error clicking existing card modal.")
+                # EXAMPLE — replace with your final pay button locator
+                print("\n--- DEBUG: Checking for existing card modal ---")
+                time.sleep(0.5)
+                card_link = driver.find_element(By.XPATH, "//a[contains(@id,'aChargeCardSM_') and contains(@class,'card-item-1-large')]")
+                card_link.click()
+                print("Existing card modal button clicked.")
+
+            except Exception as e:
+                print(f"Final step failed: {e}. Refreshing…")
+                driver.refresh()
+                time.sleep(0.4)
+        else:
+            raise Exception("Final step never became clickable.")
 
         print("Automation completed.")
 
 
 if __name__ == "__main__":
     main()
+
 
