@@ -94,6 +94,3 @@ The bot will:
 
 ---
 
-If you want, I can also **add a “How it works” diagram** showing the sequence of steps the bot clicks, which makes the README much more user-friendly.
-
-Do you want me to include that?
